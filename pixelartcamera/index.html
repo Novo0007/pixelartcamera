@@ -1,0 +1,731 @@
+<!DOCTYPE html><html><head><title>Pixel Art Camera</title><meta http-equiv="content-type" content="text/html; charset=UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, minimal-ui=1"><meta charset="UTF-8"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="description" content=""><link rel="manifest" href="manifest.json"><link rel="icon" type="image/png" href="icon64.png"><link rel="apple-touch-icon" sizes="180x180" href="icon180.png"><link rel="icon" type="image/png" sizes="32x32" href="icon32.png"><link rel="icon" type="image/png" sizes="16x16" href="icon16.png"><style>html,body {
+  margin: 0;
+  padding: 0;
+  background-color: #000;
+  overflow:hidden;
+  font-family: Verdana;
+}
+.noselect {
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  -khtml-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
+}
+#canvaswrapper {
+  text-align: center ;
+}
+</style><style>@font-face { font-family: "BitCell" ; src: url("fonts/BitCell.ttf") format("truetype"); }</style><script>window.fonts = ["BitCell"]</script></head><body class="noselect custom-cursor" oncontextmenu="return false;"><div id="canvaswrapper"></div><script type="text/javascript">var resources = {"images":[{"file":"icon.png","version":60,"size":512,"properties":{"frames":1,"fps":5}},{"file":"poster.png","version":1,"size":982199,"properties":{}},{"file":"rotate.png","version":49,"size":267,"properties":{"frames":1,"fps":5}}],"assets":[{"file":"lospec_palettes.json","version":1,"size":15492,"properties":{}}],"maps":{},"sounds":[{"file":"camerashutterclick.wav","version":1,"size":182658,"properties":{}}],"music":[]};
+var graphics = "M1";
+
+</script><script type="text/javascript">var orientation = 'landscape' ;
+var aspect = 'free' ;
+var ms_libs = [] ;
+window.skip_service_worker = true;
+window.exported_project = true;
+window.ms_use_server = false ;
+</script><script src="compiler.js"></script><script src="parser.js"></script><script src="processor.js"></script><script src="program.js"></script><script src="routine.js"></script><script src="runner.js"></script><script src="token.js"></script><script src="tokenizer.js"></script><script src="transpiler.js"></script><script src="microengine.js"></script></body><script type="text/javascript">//
+//
+// The game is started with the code below.
+// Once you have received the "started" signal (see below),
+// you can do the following:
+// 1) Inject functions or objects into the global context of the microStudio engine, example:
+//
+//   window.player.setGlobal("special_callback",function(x) { console.info(x) }) ;
+//   // Your microScript code can now call the "special_callback" function
+//
+// 2) Call microScript global functions from your JavaScript code, example:
+//
+//   window.player.call("call_me_from_javascript",[10,1000]) ;
+//   // arguments to the function call are provided as an array
+//
+// 3) Run a microScript code snippet from your JavaScript code, example:
+//
+//   window.player.exec("player.position_x = 50",function(result) { console.log(result) ; }) ;
+//
+
+window.addEventListener("load",function() {
+  window.player = new Player(function(event) {
+    if (event.name == "started") {
+      // signal that the game is started
+    }
+    else if (event.name == "log") {
+      // console.info(event.data) ;
+    }
+  }) ;
+  document.body.focus() ;
+}) ;
+
+</script><script id="code" type="text/x-microscript">
+
+
+function()
+Button = class
+  constructor = function(text,value,y)
+    this.text = text
+    this.value = value
+    this.y = y
+  end
+  
+  draw = function()
+    local x = -screen.width/2+25
+    screen.fillRect(x,y,42,32,"#111")
+    screen.fillRect(x,y,40,30,"#234")
+    local size = if (""+value).length > 3 then 10 else 18 end
+    screen.drawText(value,x,y+3,size,"#DDD")
+    screen.drawText(text,x,y-9,8,"#888")
+  end
+  
+  update = function()
+    local x = -screen.width/2+25
+    if touch.press and abs(x-touch.x) < 20 and abs(y-touch.y) < 15 then
+      action(text)
+      return true
+    end
+    
+    false
+  end
+end
+end()
+
+
+
+system.javascript("""
+
+// javascript
+
+global.Histogram = class {
+  constructor(image) {
+    if (image.frames) {
+      this.canvas = image.frames[0].canvas ;
+    } else {
+      this.canvas = image.canvas ;
+    }
+    this.build() ;
+  }
+  
+  build() {
+    var context = this.canvas.getContext("2d") ;
+    var data = context.getImageData(0,0,this.canvas.width,this.canvas.height) ;
+    var R = new Int32Array(256) ;
+    var G = new Int32Array(256) ;
+    var B = new Int32Array(256) ;
+    
+    for (var i=0 ; i<this.canvas.width ; i++) {
+      for (var j=0 ; j<this.canvas.height ; j++) {
+        var index = (i+j*this.canvas.width)*4 ;
+        var r = data.data[index] ;
+        var g = data.data[index+1] ;
+        var b = data.data[index+2] ;
+        
+        R[r] += 1 ;
+        G[g] += 1 ;
+        B[b] += 1 ;
+      }
+    }
+    
+    var threshold = 0 ; //this.canvas.width*this.canvas.height/256/4 ;
+    
+    this.max_R = 0 ;
+    this.min_R = 255 ;
+    this.max_G = 0 ;
+    this.min_G = 255 ;
+    this.max_B = 0 ;
+    this.min_B = 255 ;
+    
+    for (var i=0 ; i<255 ; i++ ) {
+      if (R[i] >= threshold) {
+        this.min_R = Math.min(this.min_R,i) ;
+        this.max_R = Math.max(this.max_R,i) ;
+      }
+      if (G[i] >= threshold) {
+        this.min_G = Math.min(this.min_G,i) ;
+        this.max_G = Math.max(this.max_G,i) ;
+      }
+      if (B[i] >= threshold) {
+        this.min_B = Math.min(this.min_B,i) ;
+        this.max_B = Math.max(this.max_B,i) ;
+      }
+    }
+    
+    this.span_R = this.max_R - this.min_R ;
+    this.span_G = this.max_G - this.min_G ;
+    this.span_B = this.max_B - this.min_B ;
+  }
+}
+
+global.PaletteHistogram = class {
+  constructor(palette) {
+    this.palette = palette ;
+    this.build() ;
+  }
+  
+  build() {
+    var R = new Int32Array(256) ;
+    var G = new Int32Array(256) ;
+    var B = new Int32Array(256) ;
+    var colors = this.palette.colors ;
+    
+    for (var i=0 ; i<colors.length ; i++) {
+      var r = colors[i][0] ;
+      var g = colors[i][1] ;
+      var b = colors[i][2] ;
+      
+      R[r] += 1 ;
+      G[g] += 1 ;
+      B[b] += 1 ;
+    }
+    
+    var threshold = 0 ;
+    
+    this.max_R = 0 ;
+    this.min_R = 255 ;
+    this.max_G = 0 ;
+    this.min_G = 255 ;
+    this.max_B = 0 ;
+    this.min_B = 255 ;
+    
+    for (var i=0 ; i<255 ; i++ ) {
+      if (R[i] >= threshold) {
+        this.min_R = Math.min(this.min_R,i) ;
+        this.max_R = Math.max(this.max_R,i) ;
+      }
+      if (G[i] >= threshold) {
+        this.min_G = Math.min(this.min_G,i) ;
+        this.max_G = Math.max(this.max_G,i) ;
+      }
+      if (B[i] >= threshold) {
+        this.min_B = Math.min(this.min_B,i) ;
+        this.max_B = Math.max(this.max_B,i) ;
+      }
+    }
+    
+    this.span_R = this.max_R - this.min_R ;
+    this.span_G = this.max_G - this.min_G ;
+    this.span_B = this.max_B - this.min_B ;
+  }
+}
+
+global.HistogramTransform = function(canvas,hsource,hdest,saturate=0,stroke=0) {
+  var context = canvas.getContext("2d") ;
+  var data = context.getImageData(0,0,canvas.width,canvas.height) ;
+  
+  for (var i=0 ; i<canvas.width-1 ; i++) {
+    for (var j=0 ; j<canvas.height-1 ; j++) {
+      var i1 = (i+j*canvas.width)*4 ;
+      var i2 = (i+1+j*canvas.width)*4 ;
+      var i3 = (i+(j+1)*canvas.width)*4 ;
+
+      var r = data.data[i1] ;
+      var g = data.data[i1+1] ;
+      var b = data.data[i1+2] ;
+
+      var r2 = data.data[i2]-r ;
+      var g2 = data.data[i2+1]-g ;
+      var b2 = data.data[i2+2]-b ;
+      
+      var r3 = data.data[i3]-r ;
+      var g3 = data.data[i3+1]-g ;
+      var b3 = data.data[i3+2]-b ;
+      
+      var err = Math.max(r2*r2+g2*g2+b2*b2,r3*r3+g3*g3+b3*b3) ;
+      if (err > 256*2*(5-stroke)) {
+        var dec = 24*stroke ;
+        data.data[i1] = Math.max(0,r-dec) ;
+        data.data[i1+1] = Math.max(0,g-dec) ;
+        data.data[i1+2] = Math.max(0,b-dec) ;
+      }
+
+    }
+  }
+
+  
+  for (var i=0 ; i<canvas.width ; i++) {
+    for (var j=0 ; j<canvas.height ; j++) {
+      var index = (i+j*canvas.width)*4 ;
+      var r = data.data[index] ;
+      var g = data.data[index+1] ;
+      var b = data.data[index+2] ;
+
+      var v = (r+g+b)/3
+      r += (r-v)*saturate ;
+      g += (g-v)*saturate ;
+      b += (b-v)*saturate ;
+      
+      r = (r - hsource.min_R)/hsource.span_R*hdest.span_R + hdest.min_R ;
+      g = (g - hsource.min_G)/hsource.span_G*hdest.span_G + hdest.min_G ;
+      b = (b - hsource.min_B)/hsource.span_B*hdest.span_B + hdest.min_B ;
+      
+      data.data[index] = Math.max(0,Math.min(255,r)) ;
+      data.data[index+1] = Math.max(0,Math.min(255,g)) ;
+      data.data[index+2] = Math.max(0,Math.min(255,b)) ;
+    }
+  }
+  
+  context.putImageData(data,0,0) ;
+}
+
+
+
+""")
+
+
+
+system.javascript("""
+
+// javascript
+
+function startVideoCapture(width=1280,height=720,facing="user") {
+  var canvas = document.createElement("canvas") ;
+  canvas.width = width ;
+  canvas.height = height ;
+  
+  var video = document.createElement("video") ;
+  video.width = width ;
+  video.height = height ;
+  video.muted = true ;
+  video.autoplay = true ;
+  
+  var context = canvas.getContext("2d");
+  var update = () => { context.drawImage(video,0,0,canvas.width,canvas.height) } ;
+  
+  var result = {
+    image: new msImage(canvas),
+    status: "starting",
+    update: update,
+    stop: () => {}
+  }
+  
+  navigator.mediaDevices.getUserMedia({ video: {
+    aspectRatio: { ideal: width/height },
+    width: { ideal: width },
+    height: { ideal: height },
+    facingMode: facing,
+    zoom: {
+      ideal: 1
+    }
+  }}).then((stream) => {
+      video.srcObject = stream;
+      video.play() ;
+      result.status = "capturing" ;
+      update() ;
+      result.stop = ()=> { video.srcObject = null ; result.status = "stopped" ; }
+    })
+    .catch((error) => {
+      result.status = "error" ;
+      result.error = error.toString() ;
+      console.error(error);
+    });
+    
+  return result ;
+}
+
+global.startVideoCapture = startVideoCapture ;
+
+""")
+
+
+
+function()
+init = function()
+  resolution_index = 2
+  resolutions = [[320,200],[192,128],[200,200],[128,128],[64,64]]
+  start(200,200)
+
+  zoom = 1
+  dithering = 1
+  stroke = 2
+  
+  colors = 16
+  palette_index = 0
+  
+  palette_list = new PaletteList()
+  
+  loader = asset_manager.loadJSON("lospec_palettes", function(res)
+    palettes = res
+  end)
+  
+  buttons = []
+  button_table = object end
+  local y = 115
+  buttons += resolution_button = new Button("resolution","200x200",y -= 35)
+  buttons += stroke_button = new Button("stroke",stroke,y -= 35)
+  buttons += dither_button = new Button("dither",dithering,y -= 35)
+  buttons += colors_button = new Button("colors",colors,y -= 35)
+  buttons += palette_button = new Button("palette",palette_index+1,y -= 35)
+end
+
+start = function(w,h)
+  WIDTH = w
+  HEIGHT = h
+  if capture.type then
+    capture.stop()
+  end
+  capture = startVideoCapture(w*4,h*4,"environment")
+  image = new Image(WIDTH,HEIGHT)
+  image.setTranslation(image.width/2,image.height/2)
+  image.setDrawAnchor(0,0)
+  image.setPixelated(false)
+  
+  buffer = new Image(WIDTH*2,HEIGHT*2)
+  buffer.setTranslation(buffer.width/2,buffer.height/2)
+  buffer.setDrawAnchor(0,0)
+  buffer.setPixelated(false)
+
+  buffer2 = new Image(WIDTH,HEIGHT)
+  buffer2.setTranslation(buffer2.width/2,buffer2.height/2)
+  buffer2.setDrawAnchor(0,0)
+  buffer2.setPixelated(false)
+end
+
+updatePalette = function()
+  print(palette_list.palettes_by_size[colors][palette_index])
+  palette = new Palette(palette_list.palettes_by_size[colors][palette_index])
+  palette_histogram = new PaletteHistogram(palette)
+end
+
+createImage = function()
+  if not palette.type and palettes.type then
+    updatePalette()
+  end
+  
+  buffer.drawImage(capture.image,0,0,buffer.width*zoom,buffer.height*zoom)
+  buffer2.drawImage(buffer,0,0,buffer2.width,buffer2.height)
+  image.drawImage(buffer2,0,0,WIDTH,HEIGHT)
+
+  local histogram = new Histogram(image)
+  HistogramTransform(image.canvas,histogram,palette_histogram,saturate/4,stroke)
+  Posterize(image.canvas,palette,dithering/8)
+  
+  image
+end
+
+update = function()
+  show_palette_info *= .975
+  if show_palette_info < .01 then
+    show_palette_info = 0
+  end
+  
+  if saved.type then
+    if saved_x > screen.width/2-10 then
+      saved = 0
+    else
+      saved_vx += (screen.width/2-saved_x)*.05
+      saved_vy += (screen.height/4-saved_y)*.1
+      saved_vx *= .5
+      saved_vy *= .5
+      saved_size_v += (.1-saved_size)*.1
+      saved_size_v *= .5
+      
+      saved_x += saved_vx
+      saved_y += saved_vy
+      saved_size += saved_size_v
+    end
+  end
+  
+  if mouse.wheel > 0 then
+    zoom = max(1,min(10,zoom*1.1))
+  elsif mouse.wheel < 0 then
+    zoom = max(1,min(10,zoom/1.1))
+  end
+  
+  if mouse.press and abs(mouse.y) < 20 and abs(mouse.x-screen.width/2+30) < 20 then
+    audio.playSound("camerashutterclick",1,1)
+    saved = new Image(image.width*6,image.height*6)
+    saved_x = 0
+    saved_y = 0
+    saved_vx = 0
+    saved_vy = 0
+    saved_size = 1
+    saved_size_v = 0
+    saved.drawImage(image,0,0,saved.width,saved.height)
+    system.file.save(saved,"photo_"+(system.time() % 1000000)+".png")
+  end
+
+  for b in buttons
+    if b.update() then
+      return
+    end
+  end
+  
+  if touch.touches.length == 2 then
+    local dx = touch.touches[0].x - touch.touches[1].x
+    local dy = touch.touches[0].y - touch.touches[1].y
+    local d = sqrt(dx*dx+dy*dy)
+    
+    if not pinch then
+      pinch = true
+      pinch_start_d = d
+      pinch_start_zoom = zoom
+    else
+      zoom = max(1,min(10,zoom*d/pinch_start_d))
+      pinch_start_d = d
+      pinch_start_zoom = zoom
+    end
+  else
+    pinch = false
+  end
+end
+
+draw = function()
+  screen.clear()
+  if screen.height > screen.width then
+    screen.drawSprite("rotate",0,0)
+    return
+  end
+
+  if capture.status == "capturing" then
+    capture.update()
+    local img = createImage()
+    screen.setDrawScale(1,1)
+//    screen.fillRect(0,0,200,200,"#FFF")
+    local w = min(screen.width,img.width/img.height*200)
+    screen.drawImage(img,0,0,w)
+    screen.setDrawScale(1,1)
+  elsif screen.isFontReady() then
+    screen.drawText(capture.status,0,0,15,"#FFF")
+    if capture.error.type then
+      screen.drawText("error = " + capture.error,0,-20,8,"#FFF")
+    end
+  end
+  
+  for b in buttons
+    b.draw()
+  end
+  
+  if show_palette_info then
+    if show_palette_info > 1 then
+      screen.setDrawScale(show_palette_info,show_palette_info)
+    else
+      screen.setAlpha(show_palette_info)
+    end
+    local p = palette_list.palettes_by_size[colors][palette_index]
+    screen.setLineWidth(2)
+    screen.drawTextOutline(p.title,0,-70,18,"#000")
+    screen.drawText(p.title,0,-70,18,"#EEE")
+    if p.user.type then
+      screen.drawTextOutline("by "+p.user,0,-85,10,"#000")
+      screen.drawText("by "+p.user,0,-85,10,"#EEE")
+    end
+    screen.setAlpha(1)
+    screen.setLineWidth(1)
+    screen.setDrawScale(1,1)
+  end
+  
+  screen.fillRect(screen.width/2-30,0,40,40,"#EEE")
+  screen.fillRect(screen.width/2-30,0,38,38,"#222")
+  screen.fillRect(screen.width/2-30,0,36,36,"#AAA")
+  screen.fillRect(screen.width/2-30,2,36,32,"#EEE")
+  
+  if saved.type then
+    local w = saved.width/saved.height*200
+    screen.fillRect(saved_x,saved_y,saved_size*w+4,saved_size*w*saved.height/saved.width+4,"#000")
+    screen.drawImage(saved,saved_x,saved_y,saved_size*w)
+  end
+end
+
+action = function(name)
+  print(name)
+  if name == "dither" then
+    dithering = (dithering+1) % 9
+    dither_button.value = dithering
+  elsif name == "colors" then
+    colors = colors*2
+    if colors > 64 then colors = 2 end
+    colors_button.value = colors
+    updatePalette()
+    show_palette_info = 1.5
+  elsif name == "palette" then
+    palette_index = (palette_index+1)%10
+    palette_button.value = (palette_index + 1)
+    updatePalette()
+    show_palette_info = 1.5
+  elsif name == "stroke" then
+    stroke = (stroke+1)%5
+    stroke_button.value = stroke
+  elsif name == "resolution" then
+    resolution_index = (resolution_index+1) % resolutions.length
+    local r = resolutions[resolution_index]
+    resolution_button.value = r[0] + "x" + r[1]
+    start(r[0],r[1])
+  end
+end
+  
+  
+
+
+end()
+
+
+
+system.javascript("""
+
+// javascript
+
+global.Palette = class {
+  constructor(image) {
+    if (image.frames) {
+      this.canvas = image.frames[0].canvas ;
+      this.build() ;
+    } else if (image.canvas) {
+      this.canvas = image.canvas ;
+      this.build() ;
+    } else if (image.colors) {
+      this.colors = [] ;
+      for (var i=0 ; i<image.colors.length ; i++) {
+        var c = Number.parseInt(image.colors[i],16) ;
+        this.colors.push([
+          (c >> 16) & 0xFF,
+          (c >> 8) & 0xFF,
+          c & 0xFF
+          ]) ;
+      }
+    }
+    
+  }
+  
+  build() {
+    this.colors = [] ;
+    var table = {} ;
+    
+    var context = this.canvas.getContext("2d") ;
+    var data = context.getImageData(0,0,this.canvas.width,this.canvas.height) ;
+
+    for (var i=0 ; i<this.canvas.width ; i++) {
+      for (var j=0 ; j<this.canvas.height ; j++) {
+        var index = (i+j*this.canvas.width)*4 ;
+        var r = data.data[index] ;
+        var g = data.data[index+1] ;
+        var b = data.data[index+2] ;
+        
+        var key = r + ","+g+","+b ;
+        if (! table[key]) {
+          table[key] = true ;
+          this.colors.push([r,g,b]) ;
+        }
+      }
+    }
+  }
+}
+
+var dither_table = [ 1, 9, 4, 9,
+                     9, 5, 9, 8,
+                     3, 9, 2, 9,
+                     9, 7, 9, 6 ] ;
+
+global.Posterize = function(canvas,palette,dithering,dithering_random) {
+  var context = canvas.getContext("2d") ;
+  var data = context.getImageData(0,0,canvas.width,canvas.height) ;
+  var colors = palette.colors ;
+  var dist = [] ;
+  var alpha_threshold = [8,7,6,5,4,3,2,1,0][Math.round(dithering*8)] ;
+  
+  for (var i=0 ; i<canvas.width ; i++) {
+    for (var j=0 ; j<canvas.height ; j++) {
+      var index = (i+j*canvas.width)*4 ;
+      var r = data.data[index] ;
+      var g = data.data[index+1] ;
+      var b = data.data[index+2] ;
+      
+      var best_score = 256*256*3 ;
+      var best = null ;
+      var best_index = colors.length ;
+      for (var k=0 ; k<colors.length ; k++) {
+        var c = colors[k] ;
+        var dr = r-c[0] ;
+        var dg = g-c[1] ;
+        var db = b-c[2] ;
+        var score = dist[k] = dr*dr+dg*dg+db*db ;
+        if (score < best_score) {
+          best = c ;
+          best_score = score ;
+          best_index = k ;
+        }
+      }
+      
+      var best2_score = 256*256*3 ;
+      var best2 = null ;
+      for (var k=0 ; k<colors.length ; k++) {
+        if (k == best_index) { continue ; }
+        var c = colors[k] ;
+        var score = dist[k] ;
+        if (score < best2_score) {
+          best2 = c ;
+          best2_score = score ;
+        }
+      }      
+      
+      var alpha = best2_score/(best_score+best2_score) ; // [.5 .. 1]
+      // alpha == .5 => equidistance
+      // alpha == 1 => best2 really far, full best1
+      alpha = 1-(alpha-.5)*2 ; // 0 == full best1 ; 1 == 50% mix
+      alpha *= 8 ;
+      alpha = Math.round(alpha) ;
+      if (alpha <= alpha_threshold) {
+        alpha = 0 ;
+      }
+      var ind = (i%4)+(j%4)*4 ;
+      if (dither_table[ind] <= alpha) {
+        best = best2 ;
+      }
+      
+/*      var d = Math.abs(alpha-.5) ;
+      if (d < .125*dithering) {
+        if ((i+j) % 2 == 0) {
+          best = best2 ;
+        }
+      } else if (d < .25*dithering) {
+        if ((i % 2 == 0) && (j % 2 == 0)) {
+          best = best2 ;
+        }
+      }      */
+      
+      data.data[index] = best[0] ;
+      data.data[index+1] = best[1] ;
+      data.data[index+2] = best[2] ;
+    }
+  }
+  
+  context.putImageData(data,0,0) ;
+}
+
+""")
+
+
+
+function()
+PaletteList = class
+  constructor = function()
+    loader = asset_manager.loadJSON("lospec_palettes", function(palettes)
+        this.palettes = palettes
+        build()
+    end)
+  end
+  
+  build = function()
+    palettes_by_size = object end
+
+    for p in palettes
+      local size = p.colors.length
+      if not palettes_by_size[size] then
+        palettes_by_size[size] = []
+      end
+      palettes_by_size[size].push(p)
+      p.palette = new Palette(p)
+      p.palette.title = p.title
+      p.palette.user = p.user
+    end
+    
+    for i=2 to 64
+      if palettes_by_size[i] then
+        print("Palettes of "+i+" colors: "+palettes_by_size[i].length)
+      end
+    end
+  end
+end
+
+end()
+
+
+</script></html>
